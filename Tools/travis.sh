@@ -37,7 +37,7 @@ build_scheme ()
 }
  
 echo "*** Building..."
-each $TRAVIS_JOB_ID
+echo $TRAVIS_JOB_ID
  
 build_scheme OCMock || exit $?
 #build_scheme OCMockLib || exit $?
