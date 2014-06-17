@@ -37,7 +37,9 @@ build_scheme ()
 }
  
 echo "*** Building..."
-echo $TRAVIS_JOB_ID
  
-build_scheme OCMock || exit $?
+build_scheme OCMock
+export buildstatus=$?
+bundle exec slather ../Source/OCMock.xcodeproj
+exit $buildstatus
 #build_scheme OCMockLib || exit $?
