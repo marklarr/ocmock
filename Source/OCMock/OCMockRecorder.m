@@ -1,15 +1,23 @@
-//---------------------------------------------------------------------------------------
-//  $Id$
-//  Copyright (c) 2004-2013 by Mulle Kybernetik. See License file for details.
-//---------------------------------------------------------------------------------------
+/*
+ *  Copyright (c) 2004-2014 Erik Doernenburg and contributors
+ *
+ *  Licensed under the Apache License, Version 2.0 (the "License"); you may
+ *  not use these files except in compliance with the License. You may obtain
+ *  a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+ *  WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+ *  License for the specific language governing permissions and limitations
+ *  under the License.
+ */
 
 #import <objc/runtime.h>
 #import <OCMock/OCMockRecorder.h>
-#import <OCMock/OCMArg.h>
-#import <OCMock/OCMConstraint.h>
 #import "OCClassMockObject.h"
 #import "OCMInvocationMatcher.h"
-#import "OCMPassByRefSetter.h"
 #import "OCMReturnValueProvider.h"
 #import "OCMBoxedReturnValueProvider.h"
 #import "OCMExceptionReturnValueProvider.h"
@@ -17,7 +25,7 @@
 #import "OCMNotificationPoster.h"
 #import "OCMBlockCaller.h"
 #import "OCMRealObjectForwarder.h"
-#import "NSInvocation+OCMAdditions.h"
+#import "OCMFunctions.h"
 
 @interface NSObject(HCMatcherDummy)
 - (BOOL)matches:(id)item;
@@ -30,9 +38,9 @@
 
 #pragma mark  Initialisers, description, accessors, etc.
 
-- (id)initWithSignatureResolver:(id)anObject
+- (id)initWithMockObject:(OCMockObject *)aMockObject
 {
-	signatureResolver = anObject;
+	mockObject = aMockObject;
     invocationMatcher = [[OCMInvocationMatcher alloc] init];
 	invocationHandlers = [[NSMutableArray alloc] init];
 	return self;
@@ -49,13 +57,6 @@
 {
     return [invocationMatcher description];
 }
-
-- (void)releaseInvocation
-{
-//	[recordedInvocation release];
-//	recordedInvocation = nil;
-}
-
 
 - (OCMInvocationMatcher *)invocationMatcher
 {
@@ -122,14 +123,14 @@
 
 - (id)classMethod
 {
+    // should we handle the case where this is called with a mock that isn't a class mock?
     [invocationMatcher setRecordedAsClassMethod:YES];
-    [signatureResolver setupClassForClassMethodMocking];
     return self;
 }
 
 - (id)ignoringNonObjectArgs
 {
-    [invocationMatcher setIngoreNonObjectArgs:YES];
+    [invocationMatcher setIgnoreNonObjectArgs:YES];
     return self;
 }
 
@@ -139,14 +140,14 @@
 - (NSMethodSignature *)methodSignatureForSelector:(SEL)aSelector
 {
     if([invocationMatcher recordedAsClassMethod])
-        return [[signatureResolver mockedClass] methodSignatureForSelector:aSelector];
+        return [[(OCClassMockObject *)mockObject mockedClass] methodSignatureForSelector:aSelector];
     
-    NSMethodSignature *signature = [signatureResolver methodSignatureForSelector:aSelector];
+    NSMethodSignature *signature = [mockObject methodSignatureForSelector:aSelector];
     if(signature == nil)
     {
         // if we're a working with a class mock and there is a class method, auto-switch
-        if(([object_getClass(signatureResolver) isSubclassOfClass:[OCClassMockObject class]]) &&
-           ([[signatureResolver mockedClass] respondsToSelector:aSelector]))
+        if(([object_getClass(mockObject) isSubclassOfClass:[OCClassMockObject class]]) &&
+           ([[(OCClassMockObject *)mockObject mockedClass] respondsToSelector:aSelector]))
         {
             [self classMethod];
             signature = [self methodSignatureForSelector:aSelector];
@@ -158,7 +159,9 @@
 - (void)forwardInvocation:(NSInvocation *)anInvocation
 {
     if([invocationMatcher recordedAsClassMethod])
-        [signatureResolver setupForwarderForClassMethodSelector:[anInvocation selector]];
+        [mockObject prepareForMockingClassMethod:[anInvocation selector]];
+    else
+        [mockObject prepareForMockingMethod:[anInvocation selector]];
 //	if(recordedInvocation != nil)
 //		[NSException raise:NSInternalInconsistencyException format:@"Recorder received two methods to record."];
 	[anInvocation setTarget:nil];
@@ -167,7 +170,7 @@
 
 - (void)doesNotRecognizeSelector:(SEL)aSelector
 {
-    [NSException raise:NSInvalidArgumentException format:@"%@: cannot stub or expect method '%@' because no such method exists in the mocked class.", signatureResolver, NSStringFromSelector(aSelector)];
+    [NSException raise:NSInvalidArgumentException format:@"%@: cannot stub or expect method '%@' because no such method exists in the mocked class.", mockObject, NSStringFromSelector(aSelector)];
 }
 
 
@@ -178,11 +181,32 @@
 
 @dynamic _andReturn;
 
-- (OCMockRecorder *(^)(id))_andReturn
+- (OCMockRecorder *(^)(NSValue *))_andReturn
 {
-    id (^theBlock)(id) = ^ (id aValue)
+    id (^theBlock)(id) = ^ (NSValue *aValue)
     {
-        return [self andReturn:aValue];
+        if(OCMIsObjectType([aValue objCType]))
+        {
+            NSValue *objValue = nil;
+            [aValue getValue:&objValue];
+            return [self andReturn:objValue];
+        }
+        else
+        {
+            return [self andReturnValue:aValue];
+        }
+    };
+    return [[theBlock copy] autorelease];
+}
+
+
+@dynamic _andThrow;
+
+- (OCMockRecorder *(^)(NSException *))_andThrow
+{
+    id (^theBlock)(id) = ^ (NSException * anException)
+    {
+        return [self andThrow:anException];
     };
     return [[theBlock copy] autorelease];
 }
