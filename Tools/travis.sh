@@ -40,6 +40,6 @@ echo "*** Building..."
  
 build_scheme OCMock
 export buildstatus=$?
-bundle exec slather ../Source/OCMock.xcodeproj
+bundle exec slather -b ./build ../Source/OCMock.xcodeproj
 exit $buildstatus
 #build_scheme OCMockLib || exit $?
