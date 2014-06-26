@@ -1,7 +1,18 @@
-//---------------------------------------------------------------------------------------
-//  $Id$
-//  Copyright (c) 2013 by Mulle Kybernetik. See License file for details.
-//---------------------------------------------------------------------------------------
+/*
+ *  Copyright (c) 2013-2014 Erik Doernenburg and contributors
+ *
+ *  Licensed under the Apache License, Version 2.0 (the "License"); you may
+ *  not use these files except in compliance with the License. You may obtain
+ *  a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+ *  WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+ *  License for the specific language governing permissions and limitations
+ *  under the License.
+ */
 
 #import <XCTest/XCTest.h>
 #import <OCMock/OCMock.h>
@@ -101,13 +112,6 @@
 	XCTAssertEqualObjects(@"hi", [mock foo], @"Should have returned stubbed value");
 }
 
-//- (void)testStubsMethodsOnPartialMockForTollFreeBridgedClasses
-//{
-//	mock = [OCMockObject partialMockForObject:[NSString stringWithString:@"hello"]];
-//	[[[mock stub] andReturn:@"hi"] uppercaseString];
-//	STAssertEqualObjects(@"hi", [mock uppercaseString], @"Should have returned stubbed value");
-//}
-
 - (void)testForwardsUnstubbedMethodsCallsToRealObjectOnPartialMock
 {
 	TestClassWithSimpleMethod *object = [[[TestClassWithSimpleMethod alloc] init] autorelease];
@@ -166,6 +170,41 @@
 {
 	numKVOCallbacks++;
 }
+
+
+- (void)testRefusesToCreateTwoPartialMocksForTheSameObject
+{
+    id object = [[[TestClassThatCallsSelf alloc] init] autorelease];
+
+    id partialMock1 = [[OCMockObject partialMockForObject:object] retain];
+
+    XCTAssertThrows([OCMockObject partialMockForObject:object], @"Should not have allowed creation of second partial mock");
+
+    [partialMock1 release];
+}
+
+- (void)testRefusesToCreatePartialMockForTollFreeBridgedClasses
+{
+    id object = (id)CFStringCreateWithCString(kCFAllocatorDefault, "foo", kCFStringEncodingASCII);
+    XCTAssertThrowsSpecificNamed([OCMockObject partialMockForObject:object],
+                                 NSException,
+                                 NSInvalidArgumentException,
+                                 @"should throw NSInvalidArgumentException exception");
+}
+
+#if TARGET_RT_64_BIT
+
+- (void)testRefusesToCreatePartialMockForTaggedPointers
+{
+    NSDate *object = [NSDate dateWithTimeIntervalSince1970:0];
+    XCTAssertThrowsSpecificNamed([OCMockObject partialMockForObject:object],
+                                 NSException,
+                                 NSInvalidArgumentException,
+                                 @"should throw NSInvalidArgumentException exception");
+}
+
+#endif
+
 
 #pragma mark   Tests for KVO interaction with mocks
 

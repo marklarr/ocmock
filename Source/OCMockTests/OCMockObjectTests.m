@@ -1,7 +1,18 @@
-//---------------------------------------------------------------------------------------
-//  $Id$
-//  Copyright (c) 2004-2010 by Mulle Kybernetik. See License file for details.
-//---------------------------------------------------------------------------------------
+/*
+ *  Copyright (c) 2004-2014 Erik Doernenburg and contributors
+ *
+ *  Licensed under the Apache License, Version 2.0 (the "License"); you may
+ *  not use these files except in compliance with the License. You may obtain
+ *  a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+ *  WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+ *  License for the specific language governing permissions and limitations
+ *  under the License.
+ */
 
 #import <XCTest/XCTest.h>
 #import <OCMock/OCMock.h>
@@ -439,6 +450,14 @@ static NSString *TestNotification = @"TestNotification";
 	XCTAssertEqualObjects(@"MOCK bar", [mock stringByAppendingString:@"bar"], @"Should have called block.");
 }
 
+- (void)testHandlesNilPassedAsBlock
+{
+    [[[mock stub] andDo:nil] stringByAppendingString:[OCMArg any]];
+
+    XCTAssertNoThrow([mock stringByAppendingString:@"foo"], @"Should have done nothing.");
+    XCTAssertNil([mock stringByAppendingString:@"foo"], @"Should have returned default value.");
+}
+
 
 - (void)testThrowsWhenTryingToUseForwardToRealObjectOnNonPartialMock
 {
@@ -618,9 +637,11 @@ static NSString *TestNotification = @"TestNotification";
 
 - (void)testFailsVerifyExpectedMethodsWithoutDelay
 {
+    [mock retain];
     dispatch_async(dispatch_queue_create("mockqueue", nil), ^{
         [NSThread sleepForTimeInterval:0.1];
         [mock lowercaseString];
+        [mock release];
     });
     
 	[[mock expect] lowercaseString];
@@ -811,7 +832,7 @@ static NSString *TestNotification = @"TestNotification";
 
 - (void)testPartialMockShouldNotRaiseWhenDescribing
 {
-    mock = [OCMockObject partialMockForObject:@"foo"];
+    mock = [OCMockObject partialMockForObject:[[NSObject alloc] init]];
     
     XCTAssertNoThrow(NSLog(@"Testing description handling dummy methods... %@ %@ %@ %@ %@",
                           @{@"bar": mock},

@@ -1,6 +1,18 @@
-//---------------------------------------------------------------------------------------
-//  Copyright (c) 2014 by Mulle Kybernetik. See License file for details.
-//---------------------------------------------------------------------------------------
+/*
+ *  Copyright (c) 2014 Erik Doernenburg and contributors
+ *
+ *  Licensed under the Apache License, Version 2.0 (the "License"); you may
+ *  not use these files except in compliance with the License. You may obtain
+ *  a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+ *  WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+ *  License for the specific language governing permissions and limitations
+ *  under the License.
+ */
 
 #import <objc/runtime.h>
 #import <OCMock/OCMArg.h>
@@ -8,6 +20,8 @@
 #import "OCMPassByRefSetter.h"
 #import "NSInvocation+OCMAdditions.h"
 #import "OCMInvocationMatcher.h"
+#import "OCClassMockObject.h"
+#import "OCMFunctions.h"
 
 
 @interface NSObject(HCMatcherDummy)
@@ -34,7 +48,7 @@
     return recordedAsClassMethod;
 }
 
-- (void)setIngoreNonObjectArgs:(BOOL)flag
+- (void)setIgnoreNonObjectArgs:(BOOL)flag
 {
     ignoreNonObjectArgs = flag;
 }
@@ -46,7 +60,12 @@
 
 - (BOOL)matchesSelector:(SEL)sel
 {
-    return (sel == [recordedInvocation selector]);
+    if(sel == [recordedInvocation selector])
+        return YES;
+    if(OCMIsAliasSelector(sel) &&
+       OCMOriginalSelectorForAlias(sel) == [recordedInvocation selector])
+        return YES;
+    return NO;
 }
 
 - (BOOL)matchesInvocation:(NSInvocation *)anInvocation
@@ -56,7 +75,7 @@
     if(isClassMethodInvocation != recordedAsClassMethod)
         return NO;
 
-    if([anInvocation selector] != [recordedInvocation selector])
+    if(![self matchesSelector:[anInvocation selector]])
         return NO;
 
     NSMethodSignature *signature = [recordedInvocation methodSignature];
